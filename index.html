@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Legends Pro</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #fff; touch-action: none; }
+        
+        #game { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        canvas { background: #87CEEB; image-rendering: pixelated; max-width: 100%; max-height: 100%; }
+        
+        .screen { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .screen.active { display: flex; }
+        
+        #splash { background: #000; animation: fadeOut 0.5s 2s forwards; }
+        @keyframes fadeOut { to { opacity: 0; pointer-events: none; } }
+        .logo { font-size: 3rem; font-weight: bold; color: #00d4ff; text-shadow: 0 0 20px #00d4ff; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        
+        #menu { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .title { font-size: 4rem; margin-bottom: 40px; text-shadow: 4px 4px 0 #000; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        
+        .btn { background: #ffd700; border: 4px solid #fff; color: #000; padding: 18px 50px; font-size: 1.3rem; margin: 12px; cursor: pointer; font-weight: bold; box-shadow: 0 8px 0 #b38f00; border-radius: 10px; min-width: 250px; text-align: center; transition: transform 0.1s; }
+        .btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #b38f00; }
+        
+        #worldMap { background: #2c1810; overflow-y: auto; padding: 30px; }
+        .world { background: linear-gradient(135deg, #3a2a1a, #5a4a3a); border: 5px solid #8b7355; border-radius: 15px; padding: 25px; margin: 25px auto; max-width: 700px; }
+        .world.locked { opacity: 0.4; filter: grayscale(1); pointer-events: none; }
+        .worldTitle { font-size: 2rem; color: #ffd700; margin-bottom: 20px; text-align: center; text-shadow: 3px 3px 0 #000; }
+        .levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; }
+        .lvl { aspect-ratio: 1; background: #654321; border: 4px solid #8b7355; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; font-size: 1.3rem; font-weight: bold; position: relative; }
+        .lvl.unlocked { background: #2e8b57; border-color: #90ee90; box-shadow: 0 5px 0 #1e5a37; }
+        .lvl.obby { background: #8b4513; }
+        .lvl.boss { background: #8b0000; font-size: 2rem; }
+        .lvl:active { transform: translateY(3px); box-shadow: 0 2px 0 #000; }
+        .stars { font-size: 0.75rem; color: #ffd700; margin-top: 4px; }
+        
+        #hud { position: absolute; top: 0; left: 0; right: 0; padding: 15px; display: none; justify-content: space-between; z-index: 50; pointer-events: none; }
+        .hudItem { background: rgba(0,0,0,0.8); padding: 10px 18px; border-radius: 10px; border: 3px solid rgba(255,255,255,0.4); font-size: 1.1rem; font-weight: bold; }
+        #pauseBtn { pointer-events: all; background: #fff; color: #000; width: 55px; height: 55px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; border: 4px solid #000; cursor: pointer; }
+        
+        #controls { position: absolute; bottom: 30px; left: 0; right: 0; padding: 0 40px; display: none; justify-content: space-between; z-index: 50; pointer-events: none; }
+        .touchBtn { width: 75px; height: 75px; background: rgba(255,255,255,0.2); border: 4px solid rgba(255,255,255,0.5); border-radius: 50%; pointer-events: all; display: flex; justify-content: center; align-items: center; font-size: 2rem; backdrop-filter: blur(5px); user-select: none; }
+        .touchBtn:active { background: rgba(255,255,255,0.5); transform: scale(0.93); }
+        .dpad { display: flex; gap: 18px; }
+        
+        #endScreen { background: rgba(0,0,0,0.96); }
+        .endTitle { font-size: 3rem; color: #00ff88; margin-bottom: 25px; }
+        .endStars { font-size: 4rem; margin: 25px 0; }
+        .stats { background: rgba(255,255,255,0.1); padding: 25px; border-radius: 12px; margin: 25px 0; font-size: 1.1rem; line-height: 1.8; }
+        
+        #shop { background: #1a1a2e; overflow-y: auto; padding: 30px; }
+        .shopGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px; max-width: 700px; margin: 0 auto; }
+        .skin { background: #16213e; border: 4px solid #0f3460; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: transform 0.2s; }
+        .skin:hover { transform: translateY(-5px); }
+        .skin.owned { border-color: #00ff88; }
+        .skin.active { background: #2a4a6a; border-color: #ffd700; box-shadow: 0 0 20px rgba(255,215,0,0.5); }
+        .skinBox { width: 70px; height: 70px; margin: 0 auto 12px; border-radius: 8px; }
+        .price { color: #ffd700; font-weight: bold; margin-top: 8px; font-size: 1.1rem; }
+        
+        #achievements { background: #0a0e27; overflow-y: auto; padding: 30px; }
+        .achList { max-width: 600px; margin: 0 auto; }
+        .ach { background: rgba(255,255,255,0.05); border: 3px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 18px; margin: 12px 0; display: flex; align-items: center; gap: 18px; }
+        .ach.got { border-color: #ffd700; background: rgba(255,215,0,0.15); }
+        .achIcon { font-size: 2.5rem; }
+        .achInfo { flex: 1; }
+        .achName { font-weight: bold; color: #ffd700; font-size: 1.2rem; }
+        .achDesc { font-size: 0.95rem; color: #aaa; margin-top: 6px; }
+        
+        #gameOver { background: radial-gradient(circle, rgba(139,0,0,0.95) 0%, rgba(0,0,0,0.98) 100%); }
+        .gameOverTitle { font-size: 4rem; color: #ff0000; text-shadow: 0 0 30px #ff0000, 4px 4px 0 #000; animation: glitch 1s infinite, shake 0.5s infinite; margin-bottom: 30px; font-weight: bold; }
+        @keyframes glitch { 0%, 100% { transform: translate(0); } 25% { transform: translate(-2px, 2px); } 50% { transform: translate(2px, -2px); } 75% { transform: translate(-2px, -2px); } }
+        @keyframes shake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-1deg); } 75% { transform: rotate(1deg); } }
+        .gameOverSubtitle { font-size: 1.5rem; color: #ff6666; margin-bottom: 30px; opacity: 0.9; }
+        .gameOverStats { background: rgba(0,0,0,0.7); border: 3px solid #ff0000; border-radius: 15px; padding: 30px; margin: 30px 0; min-width: 350px; box-shadow: 0 0 30px rgba(255,0,0,0.3); }
+        .gameOverStat { font-size: 1.3rem; margin: 15px 0; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .gameOverStat .label { color: #ff6666; }
+        .gameOverStat .value { color: #ffd700; font-weight: bold; font-size: 1.5rem; }
+        .gameOverButtons { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; }
+        .skull { font-size: 5rem; animation: float 3s ease-in-out infinite; margin-bottom: 20px; }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-15px); } }
+        
+        .back { position: fixed; bottom: 25px; left: 25px; z-index: 200; }
+        #watermark { position: fixed; bottom: 8px; right: 12px; font-size: 10px; color: rgba(255,255,255,0.3); z-index: 1000; pointer-events: none; }
+        
+        #bossBar { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: 85%; max-width: 450px; display: none; z-index: 50; }
+        .bossName { text-align: center; font-size: 1.4rem; color: #ff4444; text-shadow: 3px 3px 0 #000; margin-bottom: 8px; font-weight: bold; }
+        .bossHpBg { background: rgba(0,0,0,0.8); height: 25px; border: 3px solid #fff; border-radius: 12px; overflow: hidden; }
+        .bossHp { background: linear-gradient(90deg, #ff0000, #ff6666); height: 100%; transition: width 0.4s; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        
+        h2 { text-align: center; padding: 25px; font-size: 2.5rem; text-shadow: 3px 3px 0 #000; }
+        .coinDisplay { text-align: center; color: #ffd700; font-size: 1.4rem; margin-bottom: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <canvas id="c"></canvas>
+        <div id="watermark">RIQUELME DEVELOPER © 2025</div>
+
+        <div id="splash" class="screen active">
+            <div class="logo">RIQUELME<br>DEVELOPER</div>
+        </div>
+
+        <div id="menu" class="screen">
+            <div class="title">PIXEL LEGENDS</div>
+            <button class="btn" onclick="quickPlay()">▶️ JOGAR</button>
+            <button class="btn" onclick="openWorld()">🗺️ MUNDOS</button>
+            <button class="btn" onclick="openShop()">🛒 LOJA</button>
+            <button class="btn" onclick="openAch()">🏆 CONQUISTAS</button>
+            <button class="btn" onclick="toggleSound()">🔊 SOM: <span id="soundStatus">ON</span></button>
+        </div>
+
+        <div id="worldMap" class="screen"></div>
+        <div id="shop" class="screen"></div>
+        <div id="achievements" class="screen"></div>
+
+        <div id="hud">
+            <div style="display:flex;gap:12px;">
+                <div class="hudItem">⏱️ <span id="timeHud">0</span>s</div>
+                <div class="hudItem">❤️ <span id="livesHud">3</span></div>
+                <div class="hudItem">💰 <span id="coinsHud">0</span></div>
+            </div>
+            <button id="pauseBtn" onclick="togglePause()">⏸</button>
+        </div>
+
+        <div id="bossBar">
+            <div class="bossName" id="bossNameTxt">BOSS</div>
+            <div class="bossHpBg"><div class="bossHp" id="bossHpBar"></div></div>
+        </div>
+
+        <div id="controls">
+            <div class="dpad">
+                <div class="touchBtn" id="leftBtn">⬅</div>
+                <div class="touchBtn" id="rightBtn">➡</div>
+            </div>
+            <div class="touchBtn" id="jumpBtn">⬆</div>
+        </div>
+
+        <div id="endScreen" class="screen">
+            <div class="endTitle" id="endMsg">FASE CONCLUÍDA!</div>
+            <div class="endStars" id="endStarsDiv">⭐⭐⭐</div>
+            <div class="stats">
+                <div>⏱️ Tempo: <span id="endTime">0</span>s</div>
+                <div>💰 Moedas coletadas: <span id="endCoins">0</span></div>
+                <div>☠️ Mortes: <span id="endDeaths">0</span></div>
+            </div>
+            <button class="btn" onclick="nextLvl()">PRÓXIMO ➡</button>
+            <button class="btn" onclick="openWorld()">MAPA 🗺️</button>
+        </div>
+
+        <div id="gameOver" class="screen">
+            <div class="skull">💀</div>
+            <div class="gameOverTitle">GAME OVER</div>
+            <div class="gameOverSubtitle">Você perdeu todas as vidas!</div>
+            <div class="gameOverStats">
+                <div class="gameOverStat">
+                    <span class="label">🎯 Mundo</span>
+                    <span class="value" id="goWorld">1</span>
+                </div>
+                <div class="gameOverStat">
+                    <span class="label">📍 Fase</span>
+                    <span class="value" id="goLevel">1</span>
+                </div>
+                <div class="gameOverStat">
+                    <span class="label">⏱️ Tempo jogado</span>
+                    <span class="value" id="goTime">0s</span>
+                </div>
+                <div class="gameOverStat">
+                    <span class="label">💰 Moedas coletadas</span>
+                    <span class="value" id="goCoins">0</span>
+                </div>
+                <div class="gameOverStat">
+                    <span class="label">☠️ Total de mortes</span>
+                    <span class="value" id="goDeaths">0</span>
+                </div>
+            </div>
+            <div class="gameOverButtons">
+                <button class="btn" onclick="retryLevel()">🔄 TENTAR NOVAMENTE</button>
+                <button class="btn" onclick="openWorld()">🗺️ VOLTAR AO MAPA</button>
+                <button class="btn" onclick="openMenu()">🏠 MENU PRINCIPAL</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+c.width = 800; c.height = 600;
+
+let state = 'menu';
+let sound = true;
+let paused = false;
+
+const save = JSON.parse(localStorage.getItem('plpro')) || {
+    worlds: [1,0,0,0,0],
+    levels: {},
+    coins: 0,
+    skins: {hero:1},
+    equipped: 'hero',
+    ach: []
+};
+
+const skins = {
+    hero: {name:'Herói',color:'#ff0055',price:0},
+    knight: {name:'Cavaleiro',color:'#4169e1',price:100},
+    ninja: {name:'Ninja',color:'#2f2f2f',price:200},
+    wizard: {name:'Mago',color:'#9400d3',price:300},
+    legend: {name:'Lendário',color:'#ffd700',price:500}
+};
+
+const achievements = [
+    {id:'jump',name:'Primeiro Salto',desc:'Dê seu primeiro pulo',icon:'🦘'},
+    {id:'w1',name:'Explorador',desc:'Complete o Mundo 1',icon:'🌍'},
+    {id:'perfect',name:'Intocável',desc:'Complete sem morrer',icon:'👑'},
+    {id:'obby',name:'Mestre Obby',desc:'Complete todas Obby',icon:'🧗'},
+    {id:'boss',name:'Caçador',desc:'Derrote todos bosses',icon:'⚔️'},
+    {id:'rich',name:'Rico',desc:'Tenha 1000 moedas',icon:'💰'},
+    {id:'god',name:'LENDÁRIO',desc:'Complete 100%',icon:'🏆'}
+];
+
+const worlds = [
+    {name:'Campos Antigos',theme:'#32CD32'},
+    {name:'Ruínas de Pedra',theme:'#808080'},
+    {name:'Cavernas',theme:'#4B0082'},
+    {name:'Cidade Abandonada',theme:'#696969'},
+    {name:'Torre Final',theme:'#8B0000'}
+];
+
+let curWorld = 0, curLvl = 0;
+let p = {x:100,y:400,w:30,h:30,vx:0,vy:0,g:0,lives:5,coins:0,deaths:0,cx:100,cy:400};
+let lvl = {w:2000,h:600,plats:[],enemies:[],coins:[],spikes:[],checks:[],portal:null,boss:null};
+let cam = {x:0,y:0};
+let keys = {l:0,r:0,j:0};
+let startTime = 0;
+let particles = [];
+
+setTimeout(() => {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('menu').classList.add('active');
+}, 2500);
+
+function beep(type) {
+    if (!sound) return;
+    const ac = new AudioContext();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    const t = ac.currentTime;
+    
+    if (type === 'jump') {
+        o.frequency.setValueAtTime(200,t);
+        o.frequency.exponentialRampToValueAtTime(400,t+0.1);
+        g.gain.setValueAtTime(0.1,t);
+        g.gain.exponentialRampToValueAtTime(0.01,t+0.1);
+        o.start(t); o.stop(t+0.1);
+    } else if (type === 'coin') {
+        o.frequency.setValueAtTime(1400,t);
+        o.frequency.exponentialRampToValueAtTime(2000,t+0.08);
+        g.gain.setValueAtTime(0.15,t);
+        g.gain.exponentialRampToValueAtTime(0.01,t+0.08);
+        o.start(t); o.stop(t+0.08);
+    } else if (type === 'hit') {
+        o.type='sawtooth';
+        o.frequency.setValueAtTime(150,t);
+        g.gain.setValueAtTime(0.2,t);
+        g.gain.linearRampToValueAtTime(0,t+0.2);
+        o.start(t); o.stop(t+0.2);
+    } else if (type === 'win') {
+        o.type='triangle';
+        o.frequency.setValueAtTime(500,t);
+        o.frequency.setValueAtTime(700,t+0.15);
+        o.frequency.setValueAtTime(900,t+0.3);
+        g.gain.setValueAtTime(0.2,t);
+        g.gain.linearRampToValueAtTime(0,t+0.5);
+        o.start(t); o.stop(t+0.5);
+    }
+}
+
+function addParticle(x,y,col,n) {
+    for (let i=0; i<n; i++) {
+        particles.push({
+            x,y,
+            vx:(Math.random()-0.5)*5,
+            vy:(Math.random()-0.5)*5-2,
+            life:30,
+            col,
+            sz:Math.random()*3+2
+        });
+    }
+}
+
+function genLevel(w,l) {
+    const isObby = l===10 || l===11;
+    const isBoss = l===12;
+    const width = 1800 + w*300 + l*100;
+    const height = 600;
+    
+    lvl = {w:width,h:height,plats:[],enemies:[],coins:[],spikes:[],checks:[],portal:null,boss:null};
+    
+    if (isBoss) {
+        lvl.plats.push([0,500,width,100,'static']);
+        lvl.boss = {x:width-300,y:300,w:60,h:60,hp:80,max:80,phase:1,timer:0,dir:1};
+        lvl.portal = {x:width-100,y:420,w:50,h:80};
+    } else if (isObby) {
+        let x = 100;
+        for (let i=0; i<15; i++) {
+            const gap = 100 + Math.random()*60;
+            const y = 400 - Math.random()*120;
+            lvl.plats.push([x,y,80,15,i%4===0?'fall':'static']);
+            if (i%5===0 && i > 2) lvl.spikes.push([x+gap/2-15,height-50]);
+            x += gap + 80;
+        }
+        lvl.checks.push([width/3,350,0]);
+        lvl.checks.push([width*2/3,350,0]);
+        lvl.portal = {x:width-100,y:300,w:50,h:80};
+    } else {
+        lvl.plats.push([0,500,400,100,'static']);
+        let x = 500;
+        for (let i=0; i<6+l; i++) {
+            const gap = 120 + Math.random()*100;
+            const pw = 120 + Math.random()*80;
+            const y = 460 - Math.random()*100;
+            const typ = (i > 2 && Math.random()>0.75) ? 'moveH' : 'static';
+            lvl.plats.push([x,y,pw,50,typ,x]);
+            
+            if (Math.random()>0.4) lvl.coins.push([x+pw/2-10,y-50,20,20]);
+            if (i > 3 && Math.random()>0.85) lvl.spikes.push([x+Math.random()*pw,y+60]);
+            if (i>4 && l > 3 && Math.random()>0.8) {
+                lvl.enemies.push({x:x+50,ox:x+50,y:y-40,w:30,h:30,dir:1,hp:2,type:'walk'});
+            }
+            x += gap + pw;
+        }
+        lvl.checks.push([width/2,350,0]);
+        lvl.portal = {x:width-100,y:400,w:50,h:80};
+    }
+}
+
+function startLvl(w,l) {
+    curWorld = w; curLvl = l;
+    genLevel(w,l);
+    p = {x:100,y:lvl.h-200,w:30,h:30,vx:0,vy:0,g:0,lives:5,coins:0,deaths:0,cx:100,cy:lvl.h-200};
+    cam = {x:0,y:0};
+    startTime = Date.now();
+    particles = [];
+    
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('controls').style.display = 'flex';
+    if (lvl.boss) document.getElementById('bossBar').style.display = 'block';
+    
+    state = 'play';
+    beep('coin');
+    if (!save.ach.includes('jump')) {
+        save.ach.push('jump');
+        saveSave();
+    }
+}
+
+function openWorld() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const map = document.getElementById('worldMap');
+    map.innerHTML = '';
+    
+    worlds.forEach((world,wi) => {
+        const unlocked = save.worlds[wi];
+        const div = document.createElement('div');
+        div.className = 'world' + (unlocked ? '' : ' locked');
+        let html = `<div class="worldTitle">${world.name}</div>`;
+        
+        if (unlocked) {
+            html += '<div class="levels">';
+            for (let i=0; i<13; i++) {
+                const isObby = i===10 || i===11;
+                const isBoss = i===12;
+                const stars = save.levels[`${wi}-${i}`] || 0;
+                const canPlay = i===0 || save.levels[`${wi}-${i-1}`]>0;
+                
+                let cls = 'lvl';
+                if (canPlay) cls += ' unlocked';
+                if (isObby) cls += ' obby';
+                if (isBoss) cls += ' boss';
+                
+                const icon = isBoss ? '👑' : isObby ? '🧗' : i+1;
+                const starTxt = '⭐'.repeat(stars);
+                
+                html += `<div class="${cls}" onclick="startLvl(${wi},${i})" style="${canPlay?'':'pointer-events:none;opacity:0.3;'}">
+                    <div>${icon}</div>
+                    <div class="stars">${starTxt}</div>
+                </div>`;
+            }
+            html += '</div>';
+        } else {
+            html += '<div style="text-align:center;font-size:4rem;margin:20px;">🔒</div>';
+        }
+        
+        div.innerHTML = html;
+        map.appendChild(div);
+    });
+    
+    map.innerHTML += '<button class="btn back" onclick="openMenu()">⬅ VOLTAR</button>';
+    map.classList.add('active');
+}
+
+function openShop() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const shop = document.getElementById('shop');
+    shop.innerHTML = '<h2>LOJA DE SKINS</h2>';
+    shop.innerHTML += `<div class="coinDisplay">💰 Moedas: ${save.coins}</div>`;
+    
+    const grid = document.createElement('div');
+    grid.className = 'shopGrid';
+    
+    Object.entries(skins).forEach(([id,sk]) => {
+        const owned = save.skins[id];
+        const active = save.equipped === id;
+        
+        const div = document.createElement('div');
+        div.className = 'skin' + (owned?' owned':'') + (active?' active':'');
+        div.innerHTML = `
+            <div class="skinBox" style="background:${sk.color}"></div>
+            <div>${sk.name}</div>
+            <div class="price">${owned ? (active?'✓ ATIVO':'EQUIPAR') : '💰 '+sk.price}</div>
+        `;
+        
+        div.onclick = () => {
+            if (owned) {
+                save.equipped = id;
+                saveSave();
+                openShop();
+            } else if (save.coins >= sk.price) {
+                save.coins -= sk.price;
+                save.skins[id] = 1;
+                save.equipped = id;
+                saveSave();
+                beep('coin');
+                openShop();
+            }
+        };
+        
+        grid.appendChild(div);
+    });
+    
+    shop.appendChild(grid);
+    shop.innerHTML += '<button class="btn back" onclick="openMenu()">⬅ VOLTAR</button>';
+    shop.classList.add('active');
+}
+
+function openAch() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const ach = document.getElementById('achievements');
+    ach.innerHTML = '<h2>CONQUISTAS</h2><div class="achList">';
+    
+    achievements.forEach(a => {
+        const got = save.ach.includes(a.id);
+        ach.innerHTML += `
+            <div class="ach${got?' got':''}">
+                <div class="achIcon">${got?a.icon:'🔒'}</div>
+                <div class="achInfo">
+                    <div class="achName">${a.name}</div>
+                    <div class="achDesc">${a.desc}</div>
+                </div>
+            </div>
+        `;
+    });
+    
+    ach.innerHTML += '</div><button class="btn back" onclick="openMenu()">⬅ VOLTAR</button>';
+    ach.classList.add('active');
+}
+
+function openMenu() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('menu').classList.add('active');
+    state = 'menu';
+}
+
+function toggleSound() {
+    sound = !sound;
+    document.getElementById('soundStatus').innerText = sound ? 'ON' : 'OFF';
+}
+
+function quickPlay() {
+    // Encontra a primeira fase não completada ou última jogada
+    let foundLevel = false;
+    
+    for (let w = 0; w < 5; w++) {
+        if (!save.worlds[w]) break;
+        
+        for (let l = 0; l < 13; l++) {
+            const stars = save.levels[`${w}-${l}`] || 0;
+            
+            if (stars === 0) {
+                // Verifica se pode jogar (primeira fase ou fase anterior completa)
+                if (l === 0 || save.levels[`${w}-${l-1}`] > 0) {
+                    startLvl(w, l);
+                    foundLevel = true;
+                    break;
+                }
+            }
+        }
+        
+        if (foundLevel) break;
+    }
+    
+    // Se todas completadas, joga a primeira fase do mundo 1
+    if (!foundLevel) {
+        startLvl(0, 0);
+    }
+}
+
+function togglePause() {
+    if (state === 'play') {
+        paused = !paused;
+        document.getElementById('pauseBtn').innerText = paused ? '▶' : '⏸';
+    }
+}
+
+function nextLvl() {
+    if (curLvl < 12) {
+        startLvl(curWorld, curLvl+1);
+    } else if (curWorld < 4 && save.worlds[curWorld+1]) {
+        startLvl(curWorld+1, 0);
+    } else {
+        openWorld();
+    }
+}
+
+function saveSave() {
+    localStorage.setItem('plpro', JSON.stringify(save));
+}
+
+function jump() {
+    if (p.g && state === 'play' && !paused) {
+        p.vy = -13;
+        p.g = 0;
+        beep('jump');
+        addParticle(p.x+15, p.y+30, '#bbb', 3);
+    }
+}
+
+['leftBtn','rightBtn','jumpBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (id==='leftBtn') keys.l=1;
+        if (id==='rightBtn') keys.r=1;
+        if (id==='jumpBtn') { keys.j=1; jump(); }
+    });
+    el.addEventListener('touchend', e => {
+        e.preventDefault();
+        if (id==='leftBtn') keys.l=0;
+        if (id==='rightBtn') keys.r=0;
+        if (id==='jumpBtn') keys.j=0;
+    });
+});
+
+window.addEventListener('keydown', e => {
+    if (e.key==='ArrowLeft') keys.l=1;
+    if (e.key==='ArrowRight') keys.r=1;
+    if (e.key==='ArrowUp') { keys.j=1; jump(); }
+});
+
+window.addEventListener('keyup', e => {
+    if (e.key==='ArrowLeft') keys.l=0;
+    if (e.key==='ArrowRight') keys.r=0;
+    if (e.key==='ArrowUp') keys.j=0;
+});
+
+function update() {
+    if (state !== 'play' || paused) return;
+    
+    if (keys.l) p.vx = -5;
+    else if (keys.r) p.vx = 5;
+    else p.vx *= 0.85;
+    
+    p.x += p.vx;
+    collide('x');
+    
+    p.vy += 0.45;
+    p.y += p.vy;
+    p.g = 0;
+    collide('y');
+    
+    if (p.y > lvl.h + 100) die();
+    
+    lvl.plats.forEach(pl => {
+        if (pl[4] === 'moveH') {
+            pl[0] += 2 * (pl[6] || 1);
+            if (!pl[6]) pl[6] = 1;
+            if (pl[0] > pl[5] + 100 || pl[0] < pl[5]) pl[6] *= -1;
+        } else if (pl[4] === 'fall') {
+            if (!pl[7]) pl[7] = 0;
+            if (p.g && p.y+p.h === pl[1] && p.x+p.w > pl[0] && p.x < pl[0]+pl[2]) {
+                pl[7]++;
+                if (pl[7] > 20) pl[1] += 8;
+            }
+        }
+    });
+    
+    lvl.enemies.forEach(e => {
+        if (e.type === 'walk') {
+            e.x += 2 * e.dir;
+            if (Math.abs(e.x - e.ox) > 100) e.dir *= -1;
+        }
+        if (hit(p,e)) { beep('hit'); die(); }
+    });
+    
+    lvl.coins = lvl.coins.filter(cn => {
+        if (Math.abs(p.x - cn[0]) < 30 && Math.abs(p.y - cn[1]) < 30) {
+            p.coins++;
+            beep('coin');
+            addParticle(cn[0]+10, cn[1]+10, '#ffd700', 8);
+            return false;
+        }
+        return true;
+    });
+    
+    lvl.spikes.forEach(sp => {
+        if (hit({x:p.x+5,y:p.y+5,w:p.w-10,h:p.h-10}, {x:sp[0],y:sp[1],w:30,h:30})) {
+            beep('hit');
+            die();
+        }
+    });
+    
+    lvl.checks.forEach(ch => {
+        if (!ch[2] && hit(p, {x:ch[0],y:ch[1],w:40,h:60})) {
+            ch[2] = 1;
+            p.cx = ch[0];
+            p.cy = ch[1] - 50;
+            beep('coin');
+            addParticle(ch[0]+20, ch[1], '#00ff88', 10);
+        }
+    });
+    
+    if (lvl.portal && (!lvl.boss || lvl.boss.hp <= 0)) {
+        if (hit(p, lvl.portal)) complete();
+    }
+    
+    if (lvl.boss && lvl.boss.hp > 0) {
+        const b = lvl.boss;
+        b.timer++;
+        
+        if (b.hp < b.max / 2) b.phase = 2;
+        
+        if (b.timer % 180 < 90) {
+            b.x += 3 * b.dir * b.phase;
+            if (b.x > lvl.w - 400 || b.x < lvl.w - 600) b.dir *= -1;
+        }
+        
+        if (b.timer % 120 === 0) {
+            addParticle(b.x+30, b.y+30, '#ff0000', 15);
+        }
+        
+        if (hit(p, b)) { beep('hit'); die(); }
+        
+        document.getElementById('bossHpBar').style.width = ((b.hp/b.max)*100) + '%';
+    }
+    
+    cam.x = Math.max(0, Math.min(p.x - c.width/2, lvl.w - c.width));
+    cam.y = Math.max(0, Math.min(p.y - c.height/2, lvl.h - c.height));
+    
+    particles.forEach((pt,i) => {
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vy += 0.2;
+        pt.life--;
+        if (pt.life <= 0) particles.splice(i,1);
+    });
+    
+    const t = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById('timeHud').innerText = t;
+    document.getElementById('livesHud').innerText = p.lives;
+    document.getElementById('coinsHud').innerText = p.coins;
+}
+
+function collide(axis) {
+    for (let pl of lvl.plats) {
+        if (pl[4] === 'fall' && pl[7] > 20) continue;
+        
+        if (p.x < pl[0] + pl[2] && p.x + p.w > pl[0] && p.y < pl[1] + pl[3] && p.y + p.h > pl[1]) {
+            if (axis === 'x') {
+                if (p.vx > 0) p.x = pl[0] - p.w;
+                if (p.vx < 0) p.x = pl[0] + pl[2];
+                p.vx = 0;
+            } else {
+                if (p.vy > 0) {
+                    p.y = pl[1] - p.h;
+                    p.g = 1;
+                    p.vy = 0;
+                } else {
+                    p.y = pl[1] + pl[3];
+                    p.vy = 0;
+                }
+            }
+        }
+    }
+}
+
+function hit(a,b) {
+    return a.x < b.x + (b.w||30) && a.x + a.w > b.x && a.y < b.y + (b.h||30) && a.y + a.h > b.y;
+}
+
+function die() {
+    p.deaths++;
+    p.lives--;
+    addParticle(p.x+15, p.y+15, '#ff0000', 20);
+    
+    if (p.lives <= 0) {
+        // GAME OVER
+        const time = Math.floor((Date.now() - startTime) / 1000);
+        
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('controls').style.display = 'none';
+        document.getElementById('bossBar').style.display = 'none';
+        
+        document.getElementById('goWorld').innerText = curWorld + 1;
+        document.getElementById('goLevel').innerText = curLvl + 1;
+        document.getElementById('goTime').innerText = time + 's';
+        document.getElementById('goCoins').innerText = p.coins;
+        document.getElementById('goDeaths').innerText = p.deaths;
+        
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('gameOver').classList.add('active');
+        
+        beep('hit');
+        state = 'gameover';
+    } else {
+        p.x = p.cx;
+        p.y = p.cy;
+        p.vx = 0;
+        p.vy = 0;
+    }
+}
+
+function retryLevel() {
+    startLvl(curWorld, curLvl);
+    document.getElementById('gameOver').classList.remove('active');
+}
+
+function complete() {
+    const time = Math.floor((Date.now() - startTime) / 1000);
+    
+    let stars = 1;
+    if (time < 60) stars++;
+    if (p.deaths === 0) stars++;
+    
+    const key = `${curWorld}-${curLvl}`;
+    if (!save.levels[key] || save.levels[key] < stars) {
+        save.levels[key] = stars;
+    }
+    
+    save.coins += p.coins * 10;
+    
+    if (curLvl === 12) {
+        if (curWorld < 4) save.worlds[curWorld + 1] = 1;
+        if (curWorld === 0) {
+            if (!save.ach.includes('w1')) save.ach.push('w1');
+        }
+        if (!save.ach.includes('boss')) {
+            let allBoss = true;
+            for (let w=0; w<5; w++) {
+                if (!save.levels[`${w}-12`]) allBoss = false;
+            }
+            if (allBoss) save.ach.push('boss');
+        }
+    }
+    
+    if (p.deaths === 0 && !save.ach.includes('perfect')) {
+        save.ach.push('perfect');
+    }
+    
+    if (save.coins >= 1000 && !save.ach.includes('rich')) {
+        save.ach.push('rich');
+    }
+    
+    let allObby = true;
+    for (let w=0; w<5; w++) {
+        if (!save.levels[`${w}-10`] || !save.levels[`${w}-11`]) allObby = false;
+    }
+    if (allObby && !save.ach.includes('obby')) {
+        save.ach.push('obby');
+    }
+    
+    let all100 = true;
+    for (let w=0; w<5; w++) {
+        for (let l=0; l<13; l++) {
+            if (save.levels[`${w}-${l}`] !== 3) all100 = false;
+        }
+    }
+    if (all100 && !save.ach.includes('god')) {
+        save.ach.push('god');
+    }
+    
+    saveSave();
+    
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('bossBar').style.display = 'none';
+    
+    document.getElementById('endMsg').innerText = curLvl === 12 ? 'BOSS DERROTADO!' : 'FASE CONCLUÍDA!';
+    document.getElementById('endStarsDiv').innerText = '⭐'.repeat(stars);
+    document.getElementById('endTime').innerText = time;
+    document.getElementById('endCoins').innerText = p.coins;
+    document.getElementById('endDeaths').innerText = p.deaths;
+    
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('endScreen').classList.add('active');
+    
+    beep('win');
+    state = 'end';
+}
+
+function draw() {
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(0, 0, c.width, c.height);
+    
+    if (state !== 'play') return;
+    
+    ctx.save();
+    ctx.translate(-cam.x, -cam.y);
+    
+    ctx.fillStyle = '#228B22';
+    ctx.fillRect(0, lvl.h, lvl.w, 200);
+    
+    lvl.plats.forEach(pl => {
+        ctx.fillStyle = pl[4]==='moveH' ? '#FFA500' : pl[4]==='fall' ? '#888' : '#654321';
+        ctx.fillRect(pl[0], pl[1], pl[2], pl[3]);
+        ctx.fillStyle = '#32CD32';
+        ctx.fillRect(pl[0], pl[1], pl[2], 8);
+    });
+    
+    ctx.fillStyle = '#FFD700';
+    lvl.coins.forEach(cn => {
+        ctx.beginPath();
+        ctx.arc(cn[0]+10, cn[1]+10, 10, 0, Math.PI*2);
+        ctx.fill();
+    });
+    
+    ctx.fillStyle = '#FF0000';
+    lvl.spikes.forEach(sp => {
+        ctx.beginPath();
+        ctx.moveTo(sp[0], sp[1]+30);
+        ctx.lineTo(sp[0]+15, sp[1]);
+        ctx.lineTo(sp[0]+30, sp[1]+30);
+        ctx.fill();
+    });
+    
+    lvl.checks.forEach(ch => {
+        ctx.fillStyle = ch[2] ? '#00FF88' : '#888';
+        ctx.fillRect(ch[0], ch[1], 5, 60);
+        ctx.beginPath();
+        ctx.moveTo(ch[0]+5, ch[1]);
+        ctx.lineTo(ch[0]+30, ch[1]+15);
+        ctx.lineTo(ch[0]+5, ch[1]+30);
+        ctx.fill();
+    });
+    
+    ctx.fillStyle = '#4B0082';
+    lvl.enemies.forEach(e => {
+        ctx.fillRect(e.x, e.y, e.w, e.h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(e.x+5, e.y+8, 8, 8);
+        ctx.fillRect(e.x+17, e.y+8, 8, 8);
+        ctx.fillStyle = '#f00';
+        ctx.fillRect(e.x+7, e.y+10, 4, 4);
+        ctx.fillRect(e.x+19, e.y+10, 4, 4);
+        ctx.fillStyle = '#4B0082';
+    });
+    
+    if (lvl.boss && lvl.boss.hp > 0) {
+        const b = lvl.boss;
+        ctx.fillStyle = b.phase === 2 ? '#FF0000' : '#8B0000';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(b.x+10, b.y+10, 15, 15);
+        ctx.fillRect(b.x+35, b.y+10, 15, 15);
+    }
+    
+    if (lvl.portal && (!lvl.boss || lvl.boss.hp <= 0)) {
+        const pulse = Math.sin(Date.now()/200) * 3;
+        ctx.fillStyle = '#9400D3';
+        ctx.fillRect(lvl.portal.x-pulse, lvl.portal.y-pulse, lvl.portal.w+pulse*2, lvl.portal.h+pulse*2);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(lvl.portal.x+10, lvl.portal.y+10, lvl.portal.w-20, lvl.portal.h-20);
+    }
+    
+    const skin = skins[save.equipped];
+    ctx.fillStyle = skin.color;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x+5, p.y+8, 8, 8);
+    ctx.fillRect(p.x+17, p.y+8, 8, 8);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(p.x+7, p.y+10, 4, 4);
+    ctx.fillRect(p.x+19, p.y+10, 4, 4);
+    
+    particles.forEach(pt => {
+        ctx.fillStyle = pt.col;
+        ctx.globalAlpha = pt.life / 30;
+        ctx.fillRect(pt.x, pt.y, pt.sz, pt.sz);
+    });
+    ctx.globalAlpha = 1;
+    
+    ctx.restore();
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
